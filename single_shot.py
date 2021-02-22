@@ -1,41 +1,43 @@
-import tensorflow as tf
-physical_devices = tf.config.experimental.list_physical_devices('GPU')
-if len(physical_devices) > 0:
-    tf.config.experimental.set_memory_growth(physical_devices[0], True)
 from absl import app, flags, logging
-from absl.flags import FLAGS
 import core.utils as utils
-from core.yolov4 import filter_boxes, filter_boxes_np
-from tensorflow.python.saved_model import tag_constants
 from PIL import Image
 import cv2
 import numpy as np
-from tensorflow.compat.v1 import ConfigProto
-from tensorflow.compat.v1 import InteractiveSession
+from tflite_runtime.interpreter import Interpreter
+from intuitus_intf import Framebuffer, Camera
 
 # flags.DEFINE_string('weights', './checkpoints/yolov4-416',
 #                     'path to weights file')
 # flags.DEFINE_integer('size', 416, 'resize images to')
-#flags.DEFINE_boolean('tiny', False, 'yolo or yolo-tiny')
-#flags.DEFINE_string('model', 'yolov4', 'yolov3 or yolov4')
+flags.DEFINE_boolean('tiny', False, 'yolo or yolo-tiny')
+flags.DEFINE_string('model', 'yolov4', 'yolov3 or yolov4')
 # flags.DEFINE_string('image', './cam_data/dog.jpg', 'path to input image')
 # flags.DEFINE_string('output', 'result.png', 'path to output image')
 # flags.DEFINE_float('iou', 0.45, 'iou threshold')
-# flags.DEFINE_float('score', 0.25, 'score threshold')
+# flags.DEFINE_float('score', 0.25, 'score threshold')qui
 
 model = 'yolov4'
 tiny = 'True'
+USE_CAM = True
 
 def main(_argv):
-    config = ConfigProto()
-    config.gpu_options.allow_growth = True
-    session = InteractiveSession(config=config)
+    # config = ConfigProto()
+    # config.gpu_options.allow_growth = True
+    # session = InteractiveSession(config=config)
     STRIDES, ANCHORS, NUM_CLASS, XYSCALE = utils.load_config(flags)
     input_size = 416
     image_path = './cam_data/dog.jpg'
 
-    original_image = cv2.imread(image_path)
-    original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
+    if USE_CAM: 
+        cam = Camera('/dev/video0')
+        status, original_image = cam.capture()
+        print(status)
+        print(original_image.shape)
+        original_image = cv2.cvtColor(original_image,cv2.COLOR_YUV2RGB_Y422)
+        original_image = cv2.flip(original_image, 0)
+    else:
+        original_image = cv2.imread(image_path)
+        original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
 
     # image_data = utils.image_preprocess(np.copy(original_image), [input_size, input_size])
     image_data = cv2.resize(original_image, (input_size, input_size))
@@ -47,7 +49,7 @@ def main(_argv):
         images_data.append(image_data)
     images_data = np.asarray(images_data).astype(np.float32)
 
-    interpreter = tf.lite.Interpreter(model_path='./checkpoints/yolov4-416-tiny-int8.tflite')
+    interpreter = Interpreter(model_path='./checkpoints/yolov4-416-tiny-fp16.tflite')
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
@@ -57,9 +59,9 @@ def main(_argv):
     interpreter.invoke()
     pred = [interpreter.get_tensor(output_details[i]['index']) for i in range(len(output_details))]
     if model == 'yolov3' and tiny == True:
-        boxes, pred_conf = filter_boxes_np(pred[1], pred[0], score_threshold=0.25, input_shape=[input_size, input_size])
+        boxes, pred_conf = utils.filter_boxes_np(pred[1], pred[0], score_threshold=0.25, input_shape=[input_size, input_size])
     else:
-        boxes, pred_conf = filter_boxes_np(pred[0], pred[1], score_threshold=0.25, input_shape=[input_size, input_size])
+        boxes, pred_conf = utils.filter_boxes_np(pred[0], pred[1], score_threshold=0.25, input_shape=[input_size, input_size])
     
     np_boxes = boxes[0,:,:]
     scores = np.max(pred_conf[0,:,:],axis=-1)
@@ -73,9 +75,16 @@ def main(_argv):
     out_classes = [i[5] for i in nms_boxes]
     pred_bbox = [out_boxes, out_socres, out_classes]
     image = utils.draw_bbox_nms(original_image, pred_bbox)
-    image = Image.fromarray(image.astype(np.uint8))
-    image.show()
+    #image = Image.fromarray(image.astype(np.uint8))
+    #image.show()
     
+    fb = Framebuffer('/dev/fb0')
+    black_screen = np.zeros([1080,1920,3],dtype=np.uint8)
+    fb.update(black_screen,0)
+    print(image.shape)  
+    img_bgr = cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
+    fb.update(img_bgr,0) # (1920*20+500)*3
+
     image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
     cv2.imwrite('result.png', image)
 

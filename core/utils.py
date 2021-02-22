@@ -2,7 +2,6 @@ import cv2
 import random
 import colorsys
 import numpy as np
-import tensorflow as tf
 from core.config import cfg
 
 def load_freeze_layer(model='yolov4', tiny=False):
@@ -79,18 +78,21 @@ def read_class_names(class_file_name):
             names[ID] = name.strip('\n')
     return names
 
-def load_config(FLAGS):
-    if FLAGS.tiny:
+def load_config(model='yolov4',tiny=False):
+    if tiny:
         STRIDES = np.array(cfg.YOLO.STRIDES_TINY)
-        ANCHORS = get_anchors(cfg.YOLO.ANCHORS_TINY, FLAGS.tiny)
-        XYSCALE = cfg.YOLO.XYSCALE_TINY if FLAGS.model == 'yolov4' else [1, 1]
+        ANCHORS = get_anchors(cfg.YOLO.ANCHORS_TINY, tiny)
+        XYSCALE = cfg.YOLO.XYSCALE_TINY if model == 'yolov4' else [1, 1]
     else:
         STRIDES = np.array(cfg.YOLO.STRIDES)
-        if FLAGS.model == 'yolov4':
-            ANCHORS = get_anchors(cfg.YOLO.ANCHORS, FLAGS.tiny)
-        elif FLAGS.model == 'yolov3':
-            ANCHORS = get_anchors(cfg.YOLO.ANCHORS_V3, FLAGS.tiny)
-        XYSCALE = cfg.YOLO.XYSCALE if FLAGS.model == 'yolov4' else [1, 1, 1]
+        if model == 'yolov4':
+            ANCHORS = get_anchors(cfg.YOLO.ANCHORS, tiny)
+        elif model == 'yolov3':
+            ANCHORS = get_anchors(cfg.YOLO.ANCHORS_V3, tiny)
+        else:
+            Exception('Model not supported')
+            ANCHORS = get_anchors(cfg.YOLO.ANCHORS_V3, tiny)
+        XYSCALE = cfg.YOLO.XYSCALE if model == 'yolov4' else [1, 1, 1]
     NUM_CLASS = len(read_class_names(cfg.YOLO.CLASSES))
 
     return STRIDES, ANCHORS, NUM_CLASS, XYSCALE
@@ -240,130 +242,6 @@ def bbox_iou(bboxes1, bboxes2):
 
     return iou
 
-
-def bbox_giou(bboxes1, bboxes2):
-    """
-    Generalized IoU
-    @param bboxes1: (a, b, ..., 4)
-    @param bboxes2: (A, B, ..., 4)
-        x:X is 1:n or n:n or n:1
-    @return (max(a,A), max(b,B), ...)
-    ex) (4,):(3,4) -> (3,)
-        (2,1,4):(2,3,4) -> (2,3)
-    """
-    bboxes1_area = bboxes1[..., 2] * bboxes1[..., 3]
-    bboxes2_area = bboxes2[..., 2] * bboxes2[..., 3]
-
-    bboxes1_coor = tf.concat(
-        [
-            bboxes1[..., :2] - bboxes1[..., 2:] * 0.5,
-            bboxes1[..., :2] + bboxes1[..., 2:] * 0.5,
-        ],
-        axis=-1,
-    )
-    bboxes2_coor = tf.concat(
-        [
-            bboxes2[..., :2] - bboxes2[..., 2:] * 0.5,
-            bboxes2[..., :2] + bboxes2[..., 2:] * 0.5,
-        ],
-        axis=-1,
-    )
-
-    left_up = tf.maximum(bboxes1_coor[..., :2], bboxes2_coor[..., :2])
-    right_down = tf.minimum(bboxes1_coor[..., 2:], bboxes2_coor[..., 2:])
-
-    inter_section = tf.maximum(right_down - left_up, 0.0)
-    inter_area = inter_section[..., 0] * inter_section[..., 1]
-
-    union_area = bboxes1_area + bboxes2_area - inter_area
-
-    iou = tf.math.divide_no_nan(inter_area, union_area)
-
-    enclose_left_up = tf.minimum(bboxes1_coor[..., :2], bboxes2_coor[..., :2])
-    enclose_right_down = tf.maximum(
-        bboxes1_coor[..., 2:], bboxes2_coor[..., 2:]
-    )
-
-    enclose_section = enclose_right_down - enclose_left_up
-    enclose_area = enclose_section[..., 0] * enclose_section[..., 1]
-
-    giou = iou - tf.math.divide_no_nan(enclose_area - union_area, enclose_area)
-
-    return giou
-
-
-def bbox_ciou(bboxes1, bboxes2):
-    """
-    Complete IoU
-    @param bboxes1: (a, b, ..., 4)
-    @param bboxes2: (A, B, ..., 4)
-        x:X is 1:n or n:n or n:1
-    @return (max(a,A), max(b,B), ...)
-    ex) (4,):(3,4) -> (3,)
-        (2,1,4):(2,3,4) -> (2,3)
-    """
-    bboxes1_area = bboxes1[..., 2] * bboxes1[..., 3]
-    bboxes2_area = bboxes2[..., 2] * bboxes2[..., 3]
-
-    bboxes1_coor = tf.concat(
-        [
-            bboxes1[..., :2] - bboxes1[..., 2:] * 0.5,
-            bboxes1[..., :2] + bboxes1[..., 2:] * 0.5,
-        ],
-        axis=-1,
-    )
-    bboxes2_coor = tf.concat(
-        [
-            bboxes2[..., :2] - bboxes2[..., 2:] * 0.5,
-            bboxes2[..., :2] + bboxes2[..., 2:] * 0.5,
-        ],
-        axis=-1,
-    )
-
-    left_up = tf.maximum(bboxes1_coor[..., :2], bboxes2_coor[..., :2])
-    right_down = tf.minimum(bboxes1_coor[..., 2:], bboxes2_coor[..., 2:])
-
-    inter_section = tf.maximum(right_down - left_up, 0.0)
-    inter_area = inter_section[..., 0] * inter_section[..., 1]
-
-    union_area = bboxes1_area + bboxes2_area - inter_area
-
-    iou = tf.math.divide_no_nan(inter_area, union_area)
-
-    enclose_left_up = tf.minimum(bboxes1_coor[..., :2], bboxes2_coor[..., :2])
-    enclose_right_down = tf.maximum(
-        bboxes1_coor[..., 2:], bboxes2_coor[..., 2:]
-    )
-
-    enclose_section = enclose_right_down - enclose_left_up
-
-    c_2 = enclose_section[..., 0] ** 2 + enclose_section[..., 1] ** 2
-
-    center_diagonal = bboxes2[..., :2] - bboxes1[..., :2]
-
-    rho_2 = center_diagonal[..., 0] ** 2 + center_diagonal[..., 1] ** 2
-
-    diou = iou - tf.math.divide_no_nan(rho_2, c_2)
-
-    v = (
-        (
-            tf.math.atan(
-                tf.math.divide_no_nan(bboxes1[..., 2], bboxes1[..., 3])
-            )
-            - tf.math.atan(
-                tf.math.divide_no_nan(bboxes2[..., 2], bboxes2[..., 3])
-            )
-        )
-        * 2
-        / np.pi
-    ) ** 2
-
-    alpha = tf.math.divide_no_nan(v, 1 - iou + v)
-
-    ciou = diou - alpha * v
-
-    return ciou
-
 def nms(bboxes, iou_threshold, sigma=0.3, method='nms'):
     """
     :param bboxes: (xmin, ymin, xmax, ymax, score, class)
@@ -401,14 +279,30 @@ def nms(bboxes, iou_threshold, sigma=0.3, method='nms'):
 
     return best_bboxes
 
-def freeze_all(model, frozen=True):
-    model.trainable = not frozen
-    if isinstance(model, tf.keras.Model):
-        for l in model.layers:
-            freeze_all(l, frozen)
-def unfreeze_all(model, frozen=False):
-    model.trainable = not frozen
-    if isinstance(model, tf.keras.Model):
-        for l in model.layers:
-            unfreeze_all(l, frozen)
+def filter_boxes_np(box_xywh, scores, score_threshold=0.4, input_shape = [416,416]):
+    scores_max = np.max(scores, axis=-1)
 
+    mask = scores_max >= score_threshold
+    class_boxes = box_xywh[mask]
+    pred_conf = scores[mask]
+    class_boxes = np.reshape(class_boxes, [np.shape(scores)[0], -1, np.shape(class_boxes)[-1]])
+    pred_conf = np.reshape(pred_conf, [np.shape(scores)[0], -1, np.shape(pred_conf)[-1]])
+
+    box_xy = class_boxes[...,:2]
+    box_wh = class_boxes[...,2:]
+
+    input_shape = np.array(input_shape,dtype=np.float32)
+
+    box_yx = box_xy[..., ::-1]
+    box_hw = box_wh[..., ::-1]
+
+    box_mins = (box_yx - (box_hw / 2.)) / input_shape
+    box_maxes = (box_yx + (box_hw / 2.)) / input_shape
+    boxes = np.concatenate([
+        box_mins[..., 0:1],  # y_min
+        box_mins[..., 1:2],  # x_min
+        box_maxes[..., 0:1],  # y_max
+        box_maxes[..., 1:2]  # x_max
+    ], axis=-1)
+    # return tf.concat([boxes, pred_conf], axis=-1)
+    return (boxes, pred_conf)

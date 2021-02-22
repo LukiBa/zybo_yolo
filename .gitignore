@@ -128,3 +128,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 cam_data/cam_out.png
+result.png
