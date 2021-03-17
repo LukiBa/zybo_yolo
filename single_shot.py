@@ -18,7 +18,7 @@ flags.DEFINE_string('model', 'yolov4', 'yolov3 or yolov4')
 
 model = 'yolov4'
 tiny = 'True'
-USE_CAM = True
+USE_CAM = False
 
 def main(_argv):
     # config = ConfigProto()

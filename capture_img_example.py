@@ -13,4 +13,4 @@ img_bgr = cv2.cvtColor(img_yuv,cv2.COLOR_YUV2BGR_Y422)
 cv2.imwrite('cam_data/cam_out.png', img_bgr) 
 
 print(img_bgr.shape)
-fb.update(img_bgr)
+fb.show(img_bgr)
