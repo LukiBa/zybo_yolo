@@ -80,10 +80,10 @@ def main(_argv):
     
     fb = Framebuffer('/dev/fb0')
     black_screen = np.zeros([1080,1920,3],dtype=np.uint8)
-    fb.update(black_screen,0)
+    fb.show(black_screen,0)
     print(image.shape)  
     img_bgr = cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
-    fb.update(img_bgr,0) # (1920*20+500)*3
+    fb.show(img_bgr,0) # (1920*20+500)*3
 
     image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
     cv2.imwrite('result.png', image)

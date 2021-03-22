@@ -10,7 +10,7 @@ layer_nbr = 1
 print_last = False
 exectue_net = True 
 
-test_img = np.load(str(out_path / 'fmap_out_6.npy')).astype(np.uint8)
+test_img = np.load(str(out_path / 'fmap_out_8.npy')).astype(np.uint8)
 print(test_img.shape)
 
 elevate()

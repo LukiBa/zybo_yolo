@@ -7,7 +7,7 @@ from intuitus_intf import Intuitus_intf, Framebuffer
 command_path = pathlib.Path(__file__).absolute().parent / 'checkpoints' / 'command_out'
 out_path = pathlib.Path(__file__).absolute().parent / 'output' 
 input_size = 48
-layer_nbr = 8
+layer_nbr = 9
 print_last = False
 exectue_net = True 
 
