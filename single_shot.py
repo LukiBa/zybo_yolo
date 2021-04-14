@@ -1,34 +1,34 @@
-from absl import app, flags, logging
+import argparse
 import core.utils as utils
-from PIL import Image
 import cv2
 import numpy as np
-from tflite_runtime.interpreter import Interpreter
-from intuitus_intf import Framebuffer, Camera
 
-# flags.DEFINE_string('weights', './checkpoints/yolov4-416',
-#                     'path to weights file')
-# flags.DEFINE_integer('size', 416, 'resize images to')
-flags.DEFINE_boolean('tiny', False, 'yolo or yolo-tiny')
-flags.DEFINE_string('model', 'yolov4', 'yolov3 or yolov4')
-# flags.DEFINE_string('image', './cam_data/dog.jpg', 'path to input image')
-# flags.DEFINE_string('output', 'result.png', 'path to output image')
-# flags.DEFINE_float('iou', 0.45, 'iou threshold')
-# flags.DEFINE_float('score', 0.25, 'score threshold')qui
+try: import tflite_runtime.interpreter as tf_itp
+except: import tensorflow.lite as tf_itp
 
-model = 'yolov4'
-tiny = 'True'
-USE_CAM = False
+try: from intuitus_intf import Framebuffer, Camera
+except: pass
 
-def main(_argv):
-    # config = ConfigProto()
-    # config.gpu_options.allow_growth = True
-    # session = InteractiveSession(config=config)
-    STRIDES, ANCHORS, NUM_CLASS, XYSCALE = utils.load_config(flags)
-    input_size = 416
-    image_path = './cam_data/dog.jpg'
+def _create_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model_path', type=str, default='./checkpoints/yolov4-tiny-416.tflite', help='path to weights file')
+    parser.add_argument('--image',  type=str, default='./cam_data/dog.jpg', help='path to input image')
+    parser.add_argument('--output',  type=str, default='./result.png', help='path to output')
+    parser.add_argument('--tiny', type=bool, default=True, help='is yolo-tiny or not')
+    parser.add_argument('--size', type=int, default=416, help='define input size of export model')
+    parser.add_argument('--iou', type=float, default=0.45, help='iou threshold')
+    parser.add_argument('--score', type=float, default=0.25, help='score threshold')
+    parser.add_argument('--use_cam', type=bool, default=False, help='use camera for input img')
+    parser.add_argument('--use_fb', type=bool, default=False, help='write output to framebuffer')
+    parser.add_argument('--model', type=str, default='yolov4', help='yolov3 or yolov4')
+    return parser.parse_args()   
 
-    if USE_CAM: 
+def main(flags):
+
+    input_size = flags.size
+    image_path = flags.image
+
+    if flags.use_cam: 
         cam = Camera('/dev/video0')
         status, original_image = cam.capture()
         print(status)
@@ -49,7 +49,7 @@ def main(_argv):
         images_data.append(image_data)
     images_data = np.asarray(images_data).astype(np.float32)
 
-    interpreter = Interpreter(model_path='./checkpoints/yolov4-416-tiny-fp16.tflite')
+    interpreter = tf_itp.Interpreter(model_path=flags.model_path)
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
@@ -58,10 +58,10 @@ def main(_argv):
     interpreter.set_tensor(input_details[0]['index'], images_data)
     interpreter.invoke()
     pred = [interpreter.get_tensor(output_details[i]['index']) for i in range(len(output_details))]
-    if model == 'yolov3' and tiny == True:
-        boxes, pred_conf = utils.filter_boxes_np(pred[1], pred[0], score_threshold=0.25, input_shape=[input_size, input_size])
+    if flags.model == 'yolov3' and flags.tiny == True:
+        boxes, pred_conf = utils.filter_boxes_np(pred[1], pred[0], score_threshold=flags.score, input_shape=[input_size, input_size])
     else:
-        boxes, pred_conf = utils.filter_boxes_np(pred[0], pred[1], score_threshold=0.25, input_shape=[input_size, input_size])
+        boxes, pred_conf = utils.filter_boxes_np(pred[0], pred[1], score_threshold=flags.score, input_shape=[input_size, input_size])
     
     np_boxes = boxes[0,:,:]
     scores = np.max(pred_conf[0,:,:],axis=-1)
@@ -69,27 +69,24 @@ def main(_argv):
     bboxes = np.concatenate([np_boxes,scores.reshape([scores.shape[0],1]),
                              classes.reshape([scores.shape[0],1])],axis=1)
 
-    nms_boxes = utils.nms(bboxes,0.45)
+    nms_boxes = utils.nms(bboxes,flags.iou)
     out_boxes = [i[:4] for i in nms_boxes]
     out_socres = [i[4] for i in nms_boxes]
     out_classes = [i[5] for i in nms_boxes]
     pred_bbox = [out_boxes, out_socres, out_classes]
     image = utils.draw_bbox_nms(original_image, pred_bbox)
-    #image = Image.fromarray(image.astype(np.uint8))
-    #image.show()
     
-    fb = Framebuffer('/dev/fb0')
-    black_screen = np.zeros([1080,1920,3],dtype=np.uint8)
-    fb.show(black_screen,0)
-    print(image.shape)  
-    img_bgr = cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
-    fb.show(img_bgr,0) # (1920*20+500)*3
+    if flags.use_fb:
+        fb = Framebuffer('/dev/fb0')
+        black_screen = np.zeros([1080,1920,3],dtype=np.uint8)
+        fb.show(black_screen,0)
+        print(image.shape)  
+        img_bgr = cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
+        fb.show(img_bgr,0) # (1920*20+500)*3
 
     image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
-    cv2.imwrite('result.png', image)
+    cv2.imwrite(flags.output, image)
 
 if __name__ == '__main__':
-    try:
-        app.run(main)
-    except SystemExit:
-        pass
+    flags = _create_parser()
+    main(flags)

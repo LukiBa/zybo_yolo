@@ -3,7 +3,7 @@
 
 import numpy as np
 import tensorflow as tf
-import core.utils as utils
+import core.tf_utils as utils
 import core.common as common
 import core.backbone as backbone
 from core.config import cfg
@@ -14,17 +14,29 @@ from core.config import cfg
 # XYSCALE = cfg.YOLO.XYSCALE
 # ANCHORS = utils.get_anchors(cfg.YOLO.ANCHORS)
 
-def YOLO(input_layer, NUM_CLASS, model='yolov4', is_tiny=False):
-    if is_tiny:
-        if model == 'yolov4':
-            return YOLOv4_tiny(input_layer, NUM_CLASS)
-        elif model == 'yolov3':
-            return YOLOv3_tiny(input_layer, NUM_CLASS)
-    else:
-        if model == 'yolov4':
-            return YOLOv4(input_layer, NUM_CLASS)
-        elif model == 'yolov3':
-            return YOLOv3(input_layer, NUM_CLASS)
+def YOLO(input_layer, NUM_CLASS, model='yolov4', is_tiny=False, fbn=False):
+    if not fbn:
+        if is_tiny:
+            if model == 'yolov4':
+                return YOLOv4_tiny(input_layer, NUM_CLASS)
+            elif model == 'yolov3':
+                return YOLOv3_tiny(input_layer, NUM_CLASS)
+        else:
+            if model == 'yolov4':
+                return YOLOv4(input_layer, NUM_CLASS)
+            elif model == 'yolov3':
+                return YOLOv3(input_layer, NUM_CLASS)        
+    else: 
+        if is_tiny:
+            if model == 'yolov4':
+                return YOLOv4_tiny_fbn(input_layer, NUM_CLASS)
+            elif model == 'yolov3':
+                raise NotImplementedError("Yolov3 tiny folding batch norm not implemented yet. Simply copy backbone and set bn to False.")
+        else:
+            if model == 'yolov4':
+                raise NotImplementedError("Yolov4 folding batch norm not implemented yet. Simply copy backbone and set bn to False.")
+            elif model == 'yolov3':
+                raise NotImplementedError("Yolov3 folding batch norm not implemented yet. Simply copy backbone and set bn to False.")
 
 def YOLOv3(input_layer, NUM_CLASS):
     route_1, route_2, conv = backbone.darknet53(input_layer)
@@ -142,6 +154,24 @@ def YOLOv4_tiny(input_layer, NUM_CLASS):
     conv_mbbox = common.convolutional(conv_mobj_branch, (1, 1, 256, 3 * (NUM_CLASS + 5)), activate=False, bn=False)
 
     return [conv_mbbox, conv_lbbox]
+
+def YOLOv4_tiny_fbn(input_layer, NUM_CLASS):
+    route_1, conv = backbone.cspdarknet53_tiny_folding_bn(input_layer)
+
+    conv = common.convolutional(conv, (1, 1, 512, 256), bn=False)
+
+    conv_lobj_branch = common.convolutional(conv, (3, 3, 256, 512), bn=False)
+    conv_lbbox = common.convolutional(conv_lobj_branch, (1, 1, 512, 3 * (NUM_CLASS + 5)), activate=False, bn=False)
+
+    conv = common.convolutional(conv, (1, 1, 256, 128), bn=False)
+    conv = common.upsample(conv)
+    conv = tf.concat([conv, route_1], axis=-1)
+
+    conv_mobj_branch = common.convolutional(conv, (3, 3, 128, 256), bn=False)
+    conv_mbbox = common.convolutional(conv_mobj_branch, (1, 1, 256, 3 * (NUM_CLASS + 5)), activate=False, bn=False)
+
+    return [conv_mbbox, conv_lbbox]
+
 
 def YOLOv3_tiny(input_layer, NUM_CLASS):
     route_1, conv = backbone.darknet53_tiny(input_layer)
@@ -388,7 +418,16 @@ def compute_loss(pred, conv, label, bboxes, STRIDES, NUM_CLASS, IOU_LOSS_THRESH,
 
     return giou_loss, conf_loss, prob_loss
 
-
+def freeze_all(model, frozen=True):
+    model.trainable = not frozen
+    if isinstance(model, tf.keras.Model):
+        for l in model.layers:
+            freeze_all(l, frozen)
+def unfreeze_all(model, frozen=False):
+    model.trainable = not frozen
+    if isinstance(model, tf.keras.Model):
+        for l in model.layers:
+            unfreeze_all(l, frozen)
 
 
 

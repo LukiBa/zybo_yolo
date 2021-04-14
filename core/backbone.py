@@ -164,4 +164,44 @@ def darknet53_tiny(input_data):
 
     return route_1, input_data
 
+def cspdarknet53_tiny_folding_bn(input_data):
+    input_data = common.convolutional(input_data, (3, 3, 3, 32), bn = False, downsample=True )
+    input_data = common.convolutional(input_data, (3, 3, 32, 64), bn = False, downsample=True)
+    input_data = common.convolutional(input_data, (3, 3, 64, 64), bn = False)
 
+    route = input_data
+    input_data = common.route_group(input_data, 2, 1)
+    input_data = common.convolutional(input_data, (3, 3, 32, 32), bn = False)
+    route_1 = input_data
+    input_data = common.convolutional(input_data, (3, 3, 32, 32), bn = False)
+    input_data = tf.concat([input_data, route_1], axis=-1)
+    input_data = common.convolutional(input_data, (1, 1, 32, 64), bn = False)
+    input_data = tf.concat([route, input_data], axis=-1)
+    input_data = tf.keras.layers.MaxPool2D(2, 2, 'same')(input_data)
+
+    input_data = common.convolutional(input_data, (3, 3, 64, 128), bn = False)
+    route = input_data
+    input_data = common.route_group(input_data, 2, 1)
+    input_data = common.convolutional(input_data, (3, 3, 64, 64), bn = False)
+    route_1 = input_data
+    input_data = common.convolutional(input_data, (3, 3, 64, 64), bn = False)
+    input_data = tf.concat([input_data, route_1], axis=-1)
+    input_data = common.convolutional(input_data, (1, 1, 64, 128), bn = False)
+    input_data = tf.concat([route, input_data], axis=-1)
+    input_data = tf.keras.layers.MaxPool2D(2, 2, 'same')(input_data)
+
+    input_data = common.convolutional(input_data, (3, 3, 128, 256), bn = False)
+    route = input_data
+    input_data = common.route_group(input_data, 2, 1)
+    input_data = common.convolutional(input_data, (3, 3, 128, 128), bn = False)
+    route_1 = input_data
+    input_data = common.convolutional(input_data, (3, 3, 128, 128), bn = False)
+    input_data = tf.concat([input_data, route_1], axis=-1)
+    input_data = common.convolutional(input_data, (1, 1, 128, 256), bn = False)
+    route_1 = input_data
+    input_data = tf.concat([route, input_data], axis=-1)
+    input_data = tf.keras.layers.MaxPool2D(2, 2, 'same')(input_data)
+
+    input_data = common.convolutional(input_data, (3, 3, 512, 512), bn = False)
+
+    return route_1, input_data
