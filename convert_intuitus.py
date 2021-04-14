@@ -25,21 +25,23 @@ from Intuitus.core import float8, float6, MACC, float12
 import IntuitusExtension as C_impl
 #%% Parameter 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_path',  type=str, default='./checkpoints/yolov4-tiny-416-fb', help='path to model')
+parser.add_argument('--model_path',  type=str, default='./checkpoints/yolov4-tiny-416-backbone', help='path to model')
 flags=parser.parse_args()
 
 hw_path = pathlib.Path(Intuitus.__file__).absolute().parents[3]  / "Hardware" 
+model_path = pathlib.Path(flags.model_path).absolute()
 
 # %% load pretrained model. Use example_nn.py for training the model
-modelN = keras_models.load_model(flags.model_path)
-
+modelN = keras_models.load_model(str(model_path))
+modelN.summary()
     
 # %% Initialize Intuitus model using pretrained keras model
 model = Intuitus_Model(modelN)
 #model.keras_model.set_weights(model.quantize_weights_and_bias(model.get_weights())) 
 
 # %% software simulation of data streamer  
-commands = model.translate_conv2d(model.keras_model.layers[2],0)  
+#commands = model.translate_conv2d(model.keras_model.layers[2],0)  
+commands = model.translate()
     
 # %% hardware simulation of data streamer 
 #sim_model.run_hw_sim(layer_outs[0][0][1:2,:,:,:], 1, hw_path, testbench='tb_data_streamer', max_in_channels=32, max_tiles = 1, waveform=True)
