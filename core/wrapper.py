@@ -30,7 +30,7 @@ class Sequential:
         status, image = self.Net.execute(input)
         if status != 0:
             raise Exception("error in execution of network")        
-        status, img_float = Net.float8_to_float32(image)
+        status, img_float = self.Net.float8_to_float32(image)
         if status != 0:
             raise Exception("error converting float8 to float32") 
         return img_float, image
@@ -38,7 +38,7 @@ class Sequential:
         status, image = self.Net.execute_layer(layer_id,input)
         if status != 0:
             raise Exception("error in execution of layer {}".format(layer_id))        
-        status, img_float = Net.float8_to_float32(image)
+        status, img_float = self.Net.float8_to_float32(image)
         if status != 0:
             raise Exception("error converting float8 to float32") 
         return img_float, image
@@ -115,9 +115,9 @@ class Sequential:
 
         out_buffers = []
         for i in range(groups):
-            out_buffers = out_buffers.append(buffer(self.layer_nbr,int(in_buffer_0.filters/groups),in_buffer_0.height,in_buffer_0.width))
-            self.layer_nbr += 1
-        self.layer_nbr -= 1
+            out_buffers = out_buffers.append(buffer(self.layer_nbr+i,int(in_buffer_0.filters/groups),in_buffer_0.height,in_buffer_0.width))
+        
+        self.layer_nbr += groups-1
         return tuple(out_buffers)
 
     def summary(self):
