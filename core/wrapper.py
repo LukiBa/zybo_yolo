@@ -34,12 +34,20 @@ class Sequential:
         if status != 0:
             raise Exception("error converting float8 to float32") 
         return img_float, image
+    def forward_layer(self,layer_id,input):
+        status, image = self.Net.execute_layer(layer_id,input)
+        if status != 0:
+            raise Exception("error in execution of layer {}".format(layer_id))        
+        status, img_float = Net.float8_to_float32(image)
+        if status != 0:
+            raise Exception("error converting float8 to float32") 
+        return img_float, image
 
     def Input(self,channel,height,width):
         status=  self.Net.input_layer(channel,height,width)
         if status != 0:
             raise Exception("error configuring input layer")
-        self.layer_nbr += 1
+        #self.layer_nbr += 1
         return buffer(0,channel,height,width)
 
     def conv2d(self, in_buffer,filters,kernel_size,strides = (1,1),max_pooling=False, command_file = None):
@@ -81,9 +89,37 @@ class Sequential:
         status = self.Net.conv2d(self.layer_nbr,layer_type,in_buffer.id,in_buffer.channel,out_height,out_width,filters,tile_rx_arr[0,6],tile_tx_arr,tile_rx_arr[:,:4],command_block,command_lengths)
         if status != 0:
             self.layer_nbr -= 1
-            raise Exception("error configuring network. Layer {}".format(self.layer_nbr))
+            raise Exception("error configuring network. Conv2d layer with id: {}".format(self.layer_nbr))
 
         return buffer(self.layer_nbr,filters,out_height,out_width)
+    
+    def concat(self, in_buffer_0, in_buffer_1):
+        self.layer_nbr += 1
+        if in_buffer_0.height != in_buffer_1.height or in_buffer_0.width != in_buffer_0.width:
+            self.layer_nbr -= 1
+            raise Exception("error configuring network. In Concat layer {}. Width and Height of buffer: {} and buffer: {} have to be equal for concatenation.".format(self.layer_nbr,in_buffer_0.id,in_buffer_1.id))
+
+        status = self.Net.concat(self.layer_nbr,in_buffer_0.id,in_buffer_1.id)
+        if status != 0:
+            self.layer_nbr -= 1
+            raise Exception("error configuring network. Concat layer with id: {}".format(self.layer_nbr))        
+
+        return buffer(self.layer_nbr,in_buffer_0.filters+in_buffer_1+filters,in_buffer_0.height,in_buffer_0.width)
+
+    def split(self, in_buffer_0, groups):
+        self.layer_nbr += 1
+        status = self.Net.split(self.layer_nbr,in_buffer_0.id,groups)
+        if status != 0:
+            self.layer_nbr -= 1
+            raise Exception("error configuring network. Split layer with id: {}. Failed to split buffer {} into {} groups.".format(self.layer_nbr,in_buffer_0.id,groups))        
+
+        out_buffers = []
+        for i in range(groups):
+            out_buffers = out_buffers.append(buffer(self.layer_nbr,int(in_buffer_0.filters/groups),in_buffer_0.height,in_buffer_0.width))
+            self.layer_nbr += 1
+        self.layer_nbr -= 1
+        return tuple(out_buffers)
+
     def summary(self):
         self.Net.print_network()
     def print_layer_dma_info(self,layer_nbr):

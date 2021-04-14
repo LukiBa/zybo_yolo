@@ -19,8 +19,10 @@ print(test_img.shape)
 
 Net = nn.Sequential(command_path)
 buffer = Net.Input(3,416,416)
-buffer = Net.conv2d(buffer,32,(3,3),command_file = 'conv2d_fl8.npz')
-
+buffer = Net.conv2d(buffer,32,(3,3),strides=(2,2),command_file = 'conv2d_fl8.npz')
+buffer = Net.conv2d(buffer,64,(3,3),strides=(2,2),command_file = 'conv2d_fl8.npz')
+buffer = Net.conv2d(buffer,64,(3,3),strides=(1,1),command_file = 'conv2d_fl8.npz')
+buffer = Net.conv2d(buffer,64,(3,3),strides=(2,2),command_file = 'conv2d_fl8.npz')
 
 Net.summary()
 if print_last:
