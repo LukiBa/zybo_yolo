@@ -83,10 +83,10 @@ class Sequential:
         out_height = in_buffer.height
         out_width = in_buffer.width
         if max_pooling or stride == 2:
-            out_height /= 2
-            out_width /= 2
+            out_height = int(out_height/2)
+            out_width = int(out_width/2)
 
-        status = self.Net.conv2d(self.layer_nbr,layer_type,in_buffer.id,in_buffer.channel,out_height,out_width,filters,tile_rx_arr[0,6],tile_tx_arr,tile_rx_arr[:,:4],command_block,command_lengths)
+        status = self.Net.conv2d(self.layer_nbr,layer_type,in_buffer.id,in_buffer.channel,out_height,out_width,filters,int(tile_rx_arr[0,6]),tile_tx_arr,tile_rx_arr[:,:6],command_block,command_lengths)
         if status != 0:
             self.layer_nbr -= 1
             raise Exception("error configuring network. Conv2d layer with id: {}".format(self.layer_nbr))
@@ -106,16 +106,16 @@ class Sequential:
 
         return buffer(self.layer_nbr,in_buffer_0.filters+in_buffer_1+filters,in_buffer_0.height,in_buffer_0.width)
 
-    def split(self, in_buffer_0, groups):
+    def split(self, in_buffer, groups):
         self.layer_nbr += 1
-        status = self.Net.split(self.layer_nbr,in_buffer_0.id,groups)
+        status = self.Net.split(self.layer_nbr,in_buffer.id,groups)
         if status != 0:
             self.layer_nbr -= 1
-            raise Exception("error configuring network. Split layer with id: {}. Failed to split buffer {} into {} groups.".format(self.layer_nbr,in_buffer_0.id,groups))        
+            raise Exception("error configuring network. Split layer with id: {}. Failed to split buffer {} into {} groups.".format(self.layer_nbr,in_buffer.id,groups))        
 
         out_buffers = []
         for i in range(groups):
-            out_buffers = out_buffers.append(buffer(self.layer_nbr+i,int(in_buffer_0.filters/groups),in_buffer_0.height,in_buffer_0.width))
+            out_buffers = out_buffers.append(buffer(self.layer_nbr+i,int(in_buffer.filters/groups),in_buffer.height,in_buffer.width))
         
         self.layer_nbr += groups-1
         return tuple(out_buffers)
