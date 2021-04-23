@@ -118,7 +118,7 @@ def load_weights_folding_batchnorm(model, weights_file, model_name='yolov4', is_
 
     j = 0
     for i in range(layer_size):
-        conv_layer_name = 'conv2d_%d' %i if i > 0 else 'conv2d'
+        conv_layer_name = 'conv2d_%d' %i #if i > 0 else 'conv2d'
         bn_layer_name = 'batch_normalization_%d' %j if j > 0 else 'batch_normalization'
 
         conv_layer = model.get_layer(conv_layer_name)

@@ -129,3 +129,6 @@ dmypy.json
 .pyre/
 cam_data/cam_out.png
 result.png
+checkpoints
+intuitus_commands
+output
