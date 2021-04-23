@@ -164,6 +164,24 @@ def darknet53_tiny(input_data):
 
     return route_1, input_data
 
+def darknet53_tiny_folding_bn(input_data):
+    input_data = common.convolutional(0,input_data, (3, 3, 3, 16), bn = False)
+    input_data = tf.keras.layers.MaxPool2D(2, 2, 'same')(input_data)
+    input_data = common.convolutional(1,input_data, (3, 3, 16, 32), bn = False)
+    input_data = tf.keras.layers.MaxPool2D(2, 2, 'same')(input_data)
+    input_data = common.convolutional(2,input_data, (3, 3, 32, 64), bn = False)
+    input_data = tf.keras.layers.MaxPool2D(2, 2, 'same')(input_data)
+    input_data = common.convolutional(3,input_data, (3, 3, 64, 128), bn = False)
+    input_data = tf.keras.layers.MaxPool2D(2, 2, 'same')(input_data)
+    input_data = common.convolutional(4,input_data, (3, 3, 128, 256), bn = False)
+    route_1 = input_data
+    input_data = tf.keras.layers.MaxPool2D(2, 2, 'same')(input_data)
+    input_data = common.convolutional(5,input_data, (3, 3, 256, 512), bn = False)
+    input_data = tf.keras.layers.MaxPool2D(2, 1, 'same')(input_data)
+    input_data = common.convolutional(6,input_data, (3, 3, 512, 1024), bn = False)
+
+    return route_1, input_data
+
 def cspdarknet53_tiny_folding_bn(input_data):
     id = 0
     input_data = common.convolutional(0,input_data, (3, 3, 3, 32), bn = False, downsample=True )
