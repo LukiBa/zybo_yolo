@@ -43,17 +43,37 @@ def main(flags):
     image_data = image_data / 255.
 
     Net = nn.Sequential(command_path)
-    buffer = Net.Input(3,input_size,input_size)
+    buffer = Net.input(3,input_size,input_size)
 
-    buffer = Net.conv2d(buffer,16,(3,3),max_pooling=True,command_file='conv2d_0.npz')
-    buffer = Net.conv2d(buffer,32,(3,3),max_pooling=True,command_file='conv2d_1.npz')
-    buffer = Net.conv2d(buffer,64,(3,3),max_pooling=True,command_file='conv2d_2.npz')
-    buffer = Net.conv2d(buffer,128,(3,3),max_pooling=True,command_file='conv2d_3.npz')
-    buffer = Net.conv2d(buffer,256,(3,3),max_pooling=True,command_file='conv2d_4.npz')
+    #%% backbone 
+    buffer = Net.conv2d(buffer,16,(3,3),max_pooling=True,command_file='conv2d_0.npz') #208
+    buffer = Net.conv2d(buffer,32,(3,3),max_pooling=True,command_file='conv2d_1.npz') #104
+    buffer = Net.conv2d(buffer,64,(3,3),max_pooling=True,command_file='conv2d_2.npz') #52
+    buffer = Net.conv2d(buffer,128,(3,3),max_pooling=True,command_file='conv2d_3.npz') #26
+    buffer = Net.conv2d(buffer,256,(3,3),command_file='conv2d_4.npz') #26
+    route_1 = buffer
+    buffer = Net.maxpool2d(buffer,pool_size=(2, 2), strides=(2,2)) # Software pooling (CPU)
     buffer = Net.conv2d(buffer,512,(3,3),command_file='conv2d_5.npz')
+    buffer = Net.maxpool2d(buffer,pool_size=(2, 2), strides=(1,1)) # Software pooling (CPU)
+    buffer = Net.conv2d(buffer,1024,(3,3),command_file='conv2d_6.npz')
 
+    #%% head 
+    buffer = Net.conv2d(buffer,256,(1,1),command_file='conv2d_7.npz')
 
-    
+    lobj = buffer
+    conv_lobj_branch = Net.conv2d(lobj,512,(3,3),command_file='conv2d_8.npz')
+    conv_lbbox = Net.conv2d(conv_lobj_branch,255,(1,1),command_file='conv2d_9.npz')
+
+    buffer = Net.conv2d(buffer,128,(1,1),command_file='conv2d_10.npz')
+    buffer = Net.upsample(buffer)
+    buffer = Net.concat(buffer,route_1)
+
+    mobj = buffer
+    conv_mobj_branch = Net.conv2d(lobj,256,(3,3),command_file='conv2d_11.npz')
+    conv_mbbox = Net.conv2d(conv_lobj_branch,255,(1,1),command_file='conv2d_12.npz')  
+
+    out_lbbox = Net.output(conv_lbbox)
+    out_mbbox = Net.output(conv_mbbox)  
 
     Net.summary()
     if print_last:

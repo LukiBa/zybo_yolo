@@ -14,19 +14,25 @@ class buffer:
 class Sequential:
     def __init__(self,command_path):
         self.layer_types = {'Input'             : 0,
-                            'Conv1x1'           : 1,
-                            'InvBottleneck3x3'  : 2,
-                            'InvBottleneck5x5'  : 3,
-                            'Conv3x3'           : 4,
-                            'Conv5x5'           : 5,
-                            'Residual'          : 6,
-                            'Concat'            : 7,
-                            'Test_loop'         : 8}
-        elevate()
+                            'Output'            : 1,
+                            'Conv1x1'           : 2,
+                            'InvBottleneck3x3'  : 3,
+                            'InvBottleneck5x5'  : 4,
+                            'Conv3x3'           : 5,
+                            'Conv5x5'           : 6,
+                            'Residual'          : 7,
+                            'Concat'            : 8,
+                            'Test_loop'         : 9}
+        
+        elevate() # get root privileges. Required to open kernel driver 
+        self.command_path = command_path
         self.Net = Intuitus_intf()
         self.layer_nbr = 0
-        self.command_path = command_path
+        self.has_input = False
+        self.has_output = False        
     def __call__(self,input):
+        if not self.has_input or not self.has_output:
+            raise Exception("network requires input and output layer") 
         status, image = self.Net.execute(input)
         if status != 0:
             raise Exception("error in execution of network")        
@@ -43,12 +49,22 @@ class Sequential:
             raise Exception("error converting float8 to float32") 
         return img_float, image
 
-    def Input(self,channel,height,width):
+    def input(self,channel,height,width):
         status=  self.Net.input_layer(channel,height,width)
         if status != 0:
             raise Exception("error configuring input layer")
-        #self.layer_nbr += 1
+        self.has_input = True       
         return buffer(0,channel,height,width)
+
+    def output(self,in_buffer):
+        self.layer_nbr += 1
+        status=  self.Net.output_layer(self.layer_nbr,in_buffer.id)
+        if status != 0:
+            self.layer_nbr -= 1
+            raise Exception("error configuring output layer @{}".format(self.layer_nbr+1))
+            
+        self.has_output = True 
+        return buffer(self.layer_nbr,in_buffer.channel,in_buffer.height,in_buffer.width)
 
     def conv2d(self, in_buffer,filters,kernel_size,strides = (1,1),max_pooling=False, command_file = None):
         self.layer_nbr += 1
@@ -92,7 +108,31 @@ class Sequential:
             raise Exception("error configuring network. Conv2d layer with id: {}".format(self.layer_nbr))
 
         return buffer(self.layer_nbr,filters,out_height,out_width)
-    
+
+    def maxpool2d(self,in_buffer):
+        self.layer_nbr += 1
+        status=  self.Net.maxpool2d(self.layer_nbr,in_buffer.id)
+        if status != 0:
+            self.layer_nbr -= 1
+            raise Exception("error configuring maxpool2d layer @{}".format(self.layer_nbr+1))
+        
+        out_height = int(in_buffer.height/2)
+        out_width = int(in_buffer.width/2)
+
+        return buffer(self.layer_nbr,in_buffer.channel,out_height,out_width)
+
+    def upsample(self,in_buffer):
+        self.layer_nbr += 1
+        status=  self.Net.upsample(self.layer_nbr,in_buffer.id)
+        if status != 0:
+            self.layer_nbr -= 1
+            raise Exception("error configuring upsample layer @{}".format(self.layer_nbr+1))
+        
+        out_height = int(in_buffer.height*2)
+        out_width = int(in_buffer.width*2)
+
+        return buffer(self.layer_nbr,in_buffer.channel,out_height,out_width)
+
     def concat(self, in_buffer_0, in_buffer_1):
         self.layer_nbr += 1
         if in_buffer_0.height != in_buffer_1.height or in_buffer_0.width != in_buffer_0.width:
@@ -115,7 +155,7 @@ class Sequential:
 
         out_buffers = []
         for i in range(groups):
-            out_buffers = out_buffers.append(buffer(self.layer_nbr+i,int(in_buffer.filters/groups),in_buffer.height,in_buffer.width))
+            out_buffers = out_buffers.append(buffer(self.layer_nbr+i,int(in_buffer.channel/groups),in_buffer.height,in_buffer.width))
         
         self.layer_nbr += groups-1
         return tuple(out_buffers)

@@ -7,6 +7,7 @@ import core.wrapper as nn
 
 command_path = pathlib.Path(__file__).absolute().parent / 'checkpoints' / 'command_out'
 out_path = pathlib.Path(__file__).absolute().parent / 'output' 
+out_path.mkdir(parents=True,exist_ok=True)
 input_size = 48
 layer_nbr = 9
 
@@ -21,7 +22,7 @@ elevate()
 Net = Intuitus_intf()
 #Net.self_test()
 Net = nn.Sequential(command_path)
-buffer = Net.Input(1,48,48)
+buffer = Net.input(1,48,48)
 buffer = Net.conv2d(buffer,32,(3,3),command_file = 'conv2d_fl8.npz')
 buffer = Net.conv2d(buffer,32,(3,3),command_file = 'conv2d_fl8_1.npz')
 buffer = Net.conv2d(buffer,32,(3,3),strides=(2,2),command_file = 'conv2d_fl8_2.npz')
@@ -31,10 +32,11 @@ buffer = Net.conv2d(buffer,64,(3,3),strides=(2,2),command_file = 'conv2d_fl8_5.n
 buffer = Net.conv2d(buffer,128,(3,3),command_file = 'conv2d_fl8_6.npz')
 buffer = Net.conv2d(buffer,128,(3,3),command_file = 'conv2d_fl8_7.npz')
 buffer = Net.conv2d(buffer,128,(3,3),strides=(2,2),command_file = 'conv2d_fl8_8.npz')
+buffer = Net.output(buffer)
 
 if print_last:
     Net.summary()
-    Net.print_layer_dma_info(layer_nbr)
+    #Net.print_layer_dma_info(layer_nbr)
 if exectue_net:
     img_float, image = Net(test_img)
     outfile_name = 'fmap_out_' + str(layer_nbr) + '.npy'
