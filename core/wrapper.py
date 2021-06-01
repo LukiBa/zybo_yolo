@@ -6,9 +6,41 @@ from elevate import elevate
 class buffer:
     def __init__(self,id,channel,height,width):
         self.id = id 
-        self.channel = channel
-        self.height = height 
-        self.width = width
+        self._channel = channel
+        self._height = height 
+        self._width = width
+        self.size = self._channel * self._height * self._width
+        self.shape = (self._channel,self._height,self._width)
+
+    def __len__(self):
+        return self.size
+
+    @property
+    def channel(self):
+        return self._channel
+    @channel.setter
+    def channel(self,channel):
+        self._channel = channel
+        self.size = self._channel * self._height * self._width
+        self.shape = (self._channel,self._height,self._width)
+
+    @property
+    def height(self):
+        return self._height
+    @height.setter
+    def height(self,height):    
+        self._height = height
+        self.size = self._channel * self._height * self._width
+        self.shape = (self._channel,self._height,self._width)
+
+    @property
+    def width(self):
+        return self._width 
+    @width.setter
+    def width(self,width):
+        self._width = width
+        self.size = self._channel * self._height * self._width 
+        self.shape = (self._channel,self._height,self._width)       
 
 
 class Sequential:
@@ -29,17 +61,38 @@ class Sequential:
         self.Net = Intuitus_intf()
         self.layer_nbr = 0
         self.has_input = False
-        self.has_output = False        
+        self.has_output = False    
+        self.outputs = []
+    def __len__(self):
+        return self.layer_nbr
+
     def __call__(self,input):
         if not self.has_input or not self.has_output:
             raise Exception("network requires input and output layer") 
-        status, image = self.Net.execute(input)
+        status, fmap = self.Net.execute(input)
         if status != 0:
-            raise Exception("error in execution of network")        
-        status, img_float = self.Net.float8_to_float32(image)
-        if status != 0:
-            raise Exception("error converting float8 to float32") 
-        return img_float, image
+            raise Exception("error in execution of network")   
+    	
+        if len(self.outputs) == 1:
+            out = fmap.reshape(self.outputs[0].shape)
+            status, img_float = self.Net.float8_to_float32(out)
+            if status != 0:
+                raise Exception("error converting float8 to float32")  
+            return img_float, out
+
+        outpos = 0
+        out_fmaps = []
+        out_float = []
+        for outs in self.outputs:
+            out = fmap[outpos:outputs.size].reshape(outs.shape)
+            outpos += outputs.size
+            status, img_float = self.Net.float8_to_float32(out)
+            if status != 0:
+                raise Exception("error converting float8 to float32") 
+            out_fmaps.append(out)
+            out_float.append(img_float)    
+        return out_float, out_fmaps
+
     def forward_layer(self,layer_id,input):
         status, image = self.Net.execute_layer(layer_id,input)
         if status != 0:
@@ -64,7 +117,9 @@ class Sequential:
             raise Exception("error configuring output layer @{}".format(self.layer_nbr+1))
             
         self.has_output = True 
-        return buffer(self.layer_nbr,in_buffer.channel,in_buffer.height,in_buffer.width)
+        out_buffer = buffer(self.layer_nbr,in_buffer.channel,in_buffer.height,in_buffer.width)
+        self.outputs.append(out_buffer)
+        return out_buffer
 
     def conv2d(self, in_buffer,filters,kernel_size,strides = (1,1),max_pooling=False, command_file = None):
         self.layer_nbr += 1
@@ -123,13 +178,13 @@ class Sequential:
 
     def upsample(self,in_buffer):
         self.layer_nbr += 1
-        status=  self.Net.upsample(self.layer_nbr,in_buffer.id)
+        out_height = int(in_buffer.height*2)
+        out_width = int(in_buffer.width*2)        
+        status=  self.Net.upsample(self.layer_nbr,in_buffer.id,in_buffer.channel,out_height, out_width)
         if status != 0:
             self.layer_nbr -= 1
             raise Exception("error configuring upsample layer @{}".format(self.layer_nbr+1))
-        
-        out_height = int(in_buffer.height*2)
-        out_width = int(in_buffer.width*2)
+
 
         return buffer(self.layer_nbr,in_buffer.channel,out_height,out_width)
 
