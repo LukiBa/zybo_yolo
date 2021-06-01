@@ -2,6 +2,7 @@
 # coding=utf-8
 
 import tensorflow as tf
+from Intuitus.layers import Conv2D_int8
 # import tensorflow_addons as tfa
 class BatchNormalization(tf.keras.layers.BatchNormalization):
     """
@@ -16,7 +17,7 @@ class BatchNormalization(tf.keras.layers.BatchNormalization):
         training = tf.logical_and(training, self.trainable)
         return super().call(x, training)
 
-def convolutional(id,input_layer, filters_shape, downsample=False, activate=True, bn=True, activate_type='leaky'):
+def convolutional(id,input_layer, filters_shape, downsample=False, activate=True, bn=True, quant = False, activate_type='leaky'):
     if downsample:
         #input_layer = tf.keras.layers.ZeroPadding2D(((1, 0), (1, 0)))(input_layer) + padding top+left
         #padding = 'valid'
@@ -25,19 +26,25 @@ def convolutional(id,input_layer, filters_shape, downsample=False, activate=True
     else:
         strides = 1
         padding = 'same'
+        
+    if quant:
+        convolution_class = Conv2D_int8
+    else:
+        convolution_class = tf.keras.layers.Conv2D
 
     name = "conv2d_{}".format(id)
     if bn or not activate:
-        conv = tf.keras.layers.Conv2D(filters=filters_shape[-1], kernel_size = filters_shape[0], strides=strides, padding=padding,
-                                  use_bias=not bn, kernel_regularizer=tf.keras.regularizers.l2(0.0005),
-                                  kernel_initializer=tf.random_normal_initializer(stddev=0.01),
-                                  bias_initializer=tf.constant_initializer(0.),name=name)(input_layer)
+        conv = convolution_class(filters=filters_shape[-1], kernel_size = filters_shape[0], strides=strides,
+                                 padding=padding, use_bias=not bn, 
+                                 kernel_regularizer=tf.keras.regularizers.l2(0.0005),
+                                 kernel_initializer=tf.random_normal_initializer(stddev=0.01),
+                                 bias_initializer=tf.constant_initializer(0.),name=name)(input_layer)
     else:
-        conv = tf.keras.layers.Conv2D(filters=filters_shape[-1], kernel_size = filters_shape[0], strides=strides, 
-                                      padding=padding, use_bias=not bn, activation='relu', 
-                                      kernel_regularizer=tf.keras.regularizers.l2(0.0005),
-                                      kernel_initializer=tf.random_normal_initializer(stddev=0.01),
-                                      bias_initializer=tf.constant_initializer(0.),name=name)(input_layer)        
+        conv = convolution_class(filters=filters_shape[-1], kernel_size = filters_shape[0], strides=strides,
+                                 padding=padding, use_bias=not bn, activation='relu', 
+                                 kernel_regularizer=tf.keras.regularizers.l2(0.0005),
+                                 kernel_initializer=tf.random_normal_initializer(stddev=0.01),
+                                 bias_initializer=tf.constant_initializer(0.),name=name)(input_layer)        
 
     if bn: 
         conv = BatchNormalization()(conv)
