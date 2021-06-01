@@ -9,39 +9,45 @@ command_path = pathlib.Path(__file__).absolute().parent / 'checkpoints' / 'comma
 out_path = pathlib.Path(__file__).absolute().parent / 'output' 
 out_path.mkdir(parents=True,exist_ok=True)
 input_size = 48
-layer_nbr = 9
+layer_nbr = 6
+iterations = 1
 
-print_last = False
+print_last = True
 exectue_net = True 
 
-test_img_npz = np.load(str(command_path / 'test_img.npz'),allow_pickle=True)
-test_img = test_img_npz['img'].astype(np.uint8)
-print(test_img.shape)
+test_img_npz = np.load(str(command_path / 'test_img_int8.npz'),allow_pickle=True)
+test_img = test_img_npz['img'].astype(np.uint8).reshape((1,48,48))
+#print(test_img.shape)
+#print(test_img[0,...])
 
 elevate()
 Net = Intuitus_intf()
 #Net.self_test()
 Net = nn.Sequential(command_path)
 buffer = Net.input(1,48,48)
-buffer = Net.conv2d(buffer,32,(3,3),command_file = 'conv2d_fl8.npz')
-buffer = Net.conv2d(buffer,32,(3,3),command_file = 'conv2d_fl8_1.npz')
-buffer = Net.conv2d(buffer,32,(3,3),strides=(2,2),command_file = 'conv2d_fl8_2.npz')
-buffer = Net.conv2d(buffer,64,(3,3),command_file = 'conv2d_fl8_3.npz')
-buffer = Net.conv2d(buffer,64,(3,3),command_file = 'conv2d_fl8_4.npz')
-buffer = Net.conv2d(buffer,64,(3,3),strides=(2,2),command_file = 'conv2d_fl8_5.npz')
-buffer = Net.conv2d(buffer,128,(3,3),command_file = 'conv2d_fl8_6.npz')
-buffer = Net.conv2d(buffer,128,(3,3),command_file = 'conv2d_fl8_7.npz')
-buffer = Net.conv2d(buffer,128,(3,3),strides=(2,2),command_file = 'conv2d_fl8_8.npz')
+buffer = Net.conv2d(buffer,32,(3,3),command_file = 'conv2d_int8.npz')
+buffer = Net.conv2d(buffer,32,(3,3),command_file = 'conv2d_int8_1.npz')
+buffer = Net.conv2d(buffer,32,(3,3),strides=(2,2),command_file = 'conv2d_int8_2.npz')
+buffer = Net.conv2d(buffer,64,(3,3),command_file = 'conv2d_int8_3.npz')
+buffer = Net.conv2d(buffer,64,(3,3),command_file = 'conv2d_int8_4.npz')
+buffer = Net.conv2d(buffer,64,(3,3),strides=(2,2),command_file = 'conv2d_int8_5.npz')
+#buffer = Net.conv2d(buffer,128,(3,3),command_file = 'conv2d_int8_6.npz')
+#buffer = Net.conv2d(buffer,128,(3,3),command_file = 'conv2d_int8_7.npz')
+#buffer = Net.conv2d(buffer,128,(3,3),strides=(2,2),command_file = 'conv2d_int8_8.npz')
+#buffer = Net.upsample(buffer)
 buffer = Net.output(buffer)
+
 
 if print_last:
     Net.summary()
-    #Net.print_layer_dma_info(layer_nbr)
+    Net.print_layer_dma_info(layer_nbr)
 if exectue_net:
-    img_float, image = Net(test_img)
+    for i in range(iterations):
+        img_float, image = Net(test_img)
     outfile_name = 'fmap_out_' + str(layer_nbr) + '.npy'
     np.save(str(out_path / outfile_name), image)
     np.save(str(out_path / 'fmap_float_out.npy'), img_float)
+    print(img_float.shape)
     print('done..')
 
 # l1_conv2d_commands = np.load(str(command_path / 'conv2d_fl8.npz'),allow_pickle=True)
