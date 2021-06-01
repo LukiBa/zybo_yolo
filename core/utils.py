@@ -3,6 +3,8 @@ import random
 import colorsys
 import numpy as np
 from core.config import cfg
+import pathlib
+import json
 
 def load_freeze_layer(model='yolov4', tiny=False):
     if tiny:
@@ -154,6 +156,57 @@ def load_weights_folding_batchnorm(model, weights_file, model_name='yolov4', is_
 
     # assert len(wf.read()) == 0, 'failed to read all data'
     wf.close()
+
+def reshape_weights(weights,filters,k_size,in_channels,torch_weights_channels_first=True):
+    if torch_weights_channels_first:
+        assert weights.shape == (filters,in_channels,k_size,k_size), "Dimension missmatch reading weights with shape {} expected {}".format(weights.shape,(filters,in_channels,k_size,k_size))
+        resh_weights = np.zeros((k_size,k_size,in_channels,filters))
+        for i in range(in_channels):
+            for j in range(filters):
+                resh_weights[...,i,j] = weights[j,i,...] 
+        return resh_weights
+    else:
+        assert weights.shape == (k_size,k_size,in_channels,filters), "Dimension missmatch reading weights with shape {} expected {}".format(weights.shape,(k_size,k_size,in_channels,filters))
+        return weights
+        
+def load_weights_torch_npy_fb(model, weights_path, model_name='yolov4', is_tiny=False, keras2torch_path = './keras_2_torch_names.json',torch_weights_channels_first=True):
+    weights_path = pathlib.Path(weights_path).absolute()
+    keras2torch_path = pathlib.Path(keras2torch_path).absolute()
+    with open(keras2torch_path) as json_file:
+        data = json.load(json_file)
+        if is_tiny:
+            if model_name == 'yolov3':
+                layer_size = 13
+                tabular = data['yolov3-tiny']
+            else:
+                layer_size = 21
+                tabular = data['yolov4-tiny']
+        else:
+            if model_name == 'yolov3':
+                layer_size = 75
+                tabular = data['yolov3']
+            else:
+                layer_size = 110
+                tabular = data['yolov4']
+
+    for i in range(layer_size):
+        conv_layer_name = 'conv2d_%d' %i 
+
+        conv_layer = model.get_layer(conv_layer_name)
+        
+        filters = conv_layer.filters
+        k_size = conv_layer.kernel_size[0]
+        in_channels = conv_layer.input_shape[-1]
+        
+        weights = np.load(str(weights_path / (tabular[conv_layer_name]+'.weight.npy')))
+        weights = reshape_weights(weights,filters,k_size,in_channels,torch_weights_channels_first)
+        bias = np.load(str(weights_path / (tabular[conv_layer_name]+'.bias.npy')))
+        assert bias.shape == (filters,), "Dimension missmatch reading bias with shape {} expected {}".format(bias.shape,(filters,))
+        scale = np.load(str(weights_path / (tabular[conv_layer_name]+'.activation_shift.npy')))
+        assert scale.shape == (1,), "Dimension missmatch reading bias with shape {} expected {}".format(bias.shape,(1,))
+        scale = scale[0]
+        conv_layer.set_weights([weights, bias])
+        conv_layer.out_shfit = scale
 
 
 def read_class_names(class_file_name):

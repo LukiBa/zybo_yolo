@@ -193,17 +193,19 @@ def YOLOv3_tiny(input_layer, NUM_CLASS):
 def YOLOv3_tiny_fbn(input_layer, NUM_CLASS):
     route_1, conv = backbone.darknet53_tiny_folding_bn(input_layer)
 
-    conv = common.convolutional(7,conv, (1, 1, 1024, 256), bn=False)
+    conv = common.convolutional(7,conv, (1, 1, 1024, 256), bn=False, quant = True)
 
-    conv_lobj_branch = common.convolutional(8,conv, (3, 3, 256, 512), bn=False)
-    conv_lbbox = common.convolutional(9,conv_lobj_branch, (1, 1, 512, 3 * (NUM_CLASS + 5)), activate=False, bn=False)
+    conv_lobj_branch = common.convolutional(8,conv, (3, 3, 256, 512), bn=False, quant = True)
+    conv_lbbox = common.convolutional(9,conv_lobj_branch, (1, 1, 512, 3 * (NUM_CLASS + 5)), 
+                                      activate=False, bn=False, quant = True)
 
-    conv = common.convolutional(10,conv, (1, 1, 256, 128), bn=False)
+    conv = common.convolutional(10,conv, (1, 1, 256, 128), bn=False, quant = True)
     conv = common.upsample(conv)
     conv = tf.concat([conv, route_1], axis=-1)
 
-    conv_mobj_branch = common.convolutional(11,conv, (3, 3, 128, 256), bn=False)
-    conv_mbbox = common.convolutional(12,conv_mobj_branch, (1, 1, 256, 3 * (NUM_CLASS + 5)), activate=False, bn=False)
+    conv_mobj_branch = common.convolutional(11,conv, (3, 3, 128, 256), bn=False, quant = True)
+    conv_mbbox = common.convolutional(12,conv_mobj_branch, (1, 1, 256, 3 * (NUM_CLASS + 5)), 
+                                      activate=False, bn=False, quant = True)
 
     return [conv_mbbox, conv_lbbox]
 
