@@ -17,6 +17,7 @@ from tensorflow.keras import models as keras_models
 import tensorflow.keras.backend as keras_backend
 from tensorflow.keras.utils import plot_model
 import tensorflow as tf
+import cv2
 
 from core.yolov4 import YOLO, decode, filter_boxes
 import core.utils as utils
@@ -39,9 +40,10 @@ parser.add_argument('--model', type=str, default='yolov3', help='yolov3 or yolov
 parser.add_argument('--score_thres', type=float, default=0.2, help='define score threshold')
 parser.add_argument('--keras2torch_json',  type=str, default='./keras_2_torch_names.json', help='path name transaltion tabular json file')
 parser.add_argument('--out_path',  type=str, default='./intuitus_commands/yolov3-tiny-commands', help='command output path')
+parser.add_argument('--sim_img',  type=str, default='./cam_data/dog.jpg', help='image for simulation')
 flags=parser.parse_args()
 
-hw_path = pathlib.Path(Intuitus.__file__).absolute().parents[3]  / "Hardware" 
+hw_path = pathlib.Path(Intuitus.__file__).absolute().parents[3]  / "Intuitus_1.0" 
 out_path = pathlib.Path(flags.out_path).absolute()
 # %% load pretrained model. Use example_nn.py for training the model
 STRIDES, ANCHORS, NUM_CLASS, XYSCALE = utils.load_config(flags.model,flags.tiny)
@@ -94,10 +96,27 @@ utils.load_weights_torch_npy_fb(modelN, flags.weights, flags.model, flags.tiny, 
 model = Intuitus_Model(modelN,out_path=out_path,use_float8 =False)
 #model.keras_model.set_weights(model.quantize_weights_and_bias(model.get_weights())) 
 
-# %% software simulation of data streamer  
-#commands = model.translate_conv2d(model.keras_model.layers[2],0)  
+# %% translate commands and weights to intuitus interpretable commands
+#commands = model.translate_layer(1)
 commands = model.translate()
+
+# %% numpy simulation 
+if flags.sim_img != None:
+    original_image = cv2.imread(flags.sim_img)
+    image_data = cv2.resize(original_image, (flags.input_size, flags.input_size)) 
+    image_data = cv2.cvtColor(image_data, cv2.COLOR_BGR2RGB)
+    sim_layers = model.get_layers()
+    start = timeit.default_timer()
+    layer_nbr = 1
+    #fmap = np.clip(np.round(imgs*2**7),(-1)*(2**7-1),2**7-1) 
+    
+    sim_layer_outputs = [image_data.reshape((1,)+image_data.shape)]
+    for i in range(layer_nbr):
+        sim_layer_outputs.append(sim_layers[i+1].sim_hw(sim_layer_outputs[i]))
+    stop = timeit.default_timer()
+    #test_sim = sim_layers[3].sim_hw_1(sim_layer_outputs[2])
+    print('Runtime Numpy implementation: ', stop - start)  
     
 # %% hardware simulation of data streamer 
-#sim_model.run_hw_sim(layer_outs[0][0][1:2,:,:,:], 1, hw_path, testbench='tb_data_streamer', max_in_channels=32, max_tiles = 1, waveform=True)
+model.run_hw_sim(sim_layer_outputs[layer_nbr-1], layer_nbr, hw_path, max_pooling=1, testbench='tb_data_streamer',max_in_channels=4, max_tiles = 4, waveform=True, use_float8 = False)
 # %% software simulation   
