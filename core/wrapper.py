@@ -44,7 +44,7 @@ class buffer:
 
 
 class Sequential:
-    def __init__(self,command_path):
+    def __init__(self,command_path,use_float8=False):
         self.layer_types = {'Input'             : 0,
                             'Output'            : 1,
                             'Conv1x1'           : 2,
@@ -63,6 +63,7 @@ class Sequential:
         self.has_input = False
         self.has_output = False    
         self.outputs = []
+        self.use_float8 = use_float8
     def __len__(self):
         return self.layer_nbr
 
@@ -75,23 +76,31 @@ class Sequential:
     	
         if len(self.outputs) == 1:
             out = fmap.reshape(self.outputs[0].shape)
-            status, img_float = self.Net.float8_to_float32(out)
-            if status != 0:
-                raise Exception("error converting float8 to float32")  
-            return img_float, out
+            if self.use_float8:
+                status, img_float = self.Net.float8_to_float32(out)
+                if status != 0:
+                    raise Exception("error converting float8 to float32")  
+                return img_float, out
+            else:
+                return out
 
         outpos = 0
         out_fmaps = []
         out_float = []
         for outs in self.outputs:
-            out = fmap[outpos:outputs.size].reshape(outs.shape)
-            outpos += outputs.size
-            status, img_float = self.Net.float8_to_float32(out)
-            if status != 0:
-                raise Exception("error converting float8 to float32") 
-            out_fmaps.append(out)
-            out_float.append(img_float)    
-        return out_float, out_fmaps
+            out = fmap[outpos:outs.size].reshape(outs.shape)
+            outpos += outs.size
+            if self.use_float8:
+                status, img_float = self.Net.float8_to_float32(out)
+                if status != 0:
+                    raise Exception("error converting float8 to float32") 
+                out_float.append(img_float) 
+
+            out_fmaps.append(out) 
+        if self.use_float8:    
+            return out_float, out_fmaps
+        else:
+            return out_fmaps
 
     def forward_layer(self,layer_id,input):
         status, image = self.Net.execute_layer(layer_id,input)
