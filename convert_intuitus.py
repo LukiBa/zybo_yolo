@@ -98,7 +98,7 @@ model = Intuitus_Model(modelN,out_path=out_path,use_float8 =False)
 
 # %% translate commands and weights to intuitus interpretable commands
 #commands = model.translate_layer(1)
-commands = model.translate()
+#commands = model.translate()
 
 # %% numpy simulation 
 if flags.sim_img != None:
@@ -118,5 +118,5 @@ if flags.sim_img != None:
     print('Runtime Numpy implementation: ', stop - start)  
     
 # %% hardware simulation of data streamer 
-model.run_hw_sim(sim_layer_outputs[layer_nbr-1], layer_nbr, hw_path, max_pooling=1, testbench='tb_data_streamer',max_in_channels=4, max_tiles = 4, waveform=True, use_float8 = False)
+#model.run_hw_sim(sim_layer_outputs[layer_nbr-1], layer_nbr, hw_path, max_pooling=1, testbench='tb_data_streamer',max_in_channels=4, max_tiles = 4, waveform=True, use_float8 = False)
 # %% software simulation   
