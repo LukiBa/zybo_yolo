@@ -206,7 +206,8 @@ def load_weights_torch_npy_fb(model, weights_path, model_name='yolov4', is_tiny=
         assert scale.shape == (1,), "Dimension missmatch reading bias with shape {} expected {}".format(bias.shape,(1,))
         scale = scale[0]
         conv_layer.set_weights([weights, bias])
-        conv_layer.out_shfit = scale
+        conv_layer.out_shift = scale
+        conv_layer.quantized_param = True
 
 
 def read_class_names(class_file_name):
