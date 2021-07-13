@@ -73,6 +73,8 @@ class Sequential:
         status, fmap = self.Net.execute(input)
         if status != 0:
             raise Exception("error in execution of network")   
+        #print(fmap.shape)
+        #print(fmap[208*208*2:208*208*2+10])            
     	
         if len(self.outputs) == 1:
             out = fmap.reshape(self.outputs[0].shape)
@@ -142,6 +144,10 @@ class Sequential:
         command_block = conv2d_commands['tx_bin'].astype(np.int32)
         tile_tx_arr = conv2d_commands['tx_tile'].astype(np.uint32)
         tile_rx_arr = conv2d_commands['rx_tile'].astype(np.uint32)
+        print(command_lengths.shape)
+        print(command_block.shape)
+        print(tile_tx_arr.shape)
+        print(tile_rx_arr.shape)
         if kernel_size == (1,1):
             layer_type = self.layer_types['Conv1x1']
         elif kernel_size == (3,3):
@@ -169,13 +175,26 @@ class Sequential:
         status = self.Net.conv2d(self.layer_nbr,layer_type,in_buffer.id,in_buffer.channel,out_height,out_width,filters,int(tile_rx_arr[0,6]),tile_tx_arr,tile_rx_arr[:,:6],command_block,command_lengths)
         if status != 0:
             self.layer_nbr -= 1
-            raise Exception("error configuring network. Conv2d layer with id: {}".format(self.layer_nbr))
+            raise Exception("error configuring network. Error code {}. Conv2d layer with id: {}".format(status,self.layer_nbr))
 
         return buffer(self.layer_nbr,filters,out_height,out_width)
 
-    def maxpool2d(self,in_buffer):
+    def maxpool2d(self,in_buffer, strides=(2,2)):
+        if strides == (2,2):
+            stride = 2
+            out_height = int(in_buffer.height/2)
+            out_width = int(in_buffer.width/2)                    
+        elif strides == (1,1):
+            stride = 1
+            out_height = int(in_buffer.height)
+            out_width = int(in_buffer.width)                    
+        else:
+            raise NotImplementedError("Strides {} not implemented. Use ether (2,2) or (1,1)".format(strides))
+        
+
+        
         self.layer_nbr += 1
-        status=  self.Net.maxpool2d(self.layer_nbr,in_buffer.id)
+        status=  self.Net.maxpool2d(self.layer_nbr,in_buffer.id,in_buffer.channel,out_height, out_width,stride)
         if status != 0:
             self.layer_nbr -= 1
             raise Exception("error configuring maxpool2d layer @{}".format(self.layer_nbr+1))
