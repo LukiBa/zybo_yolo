@@ -198,9 +198,6 @@ class Sequential:
         if status != 0:
             self.layer_nbr -= 1
             raise Exception("error configuring maxpool2d layer @{}".format(self.layer_nbr+1))
-        
-        out_height = int(in_buffer.height/2)
-        out_width = int(in_buffer.width/2)
 
         return buffer(self.layer_nbr,in_buffer.channel,out_height,out_width)
 
