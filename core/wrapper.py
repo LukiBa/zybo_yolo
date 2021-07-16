@@ -190,9 +190,7 @@ class Sequential:
             out_width = int(in_buffer.width)                    
         else:
             raise NotImplementedError("Strides {} not implemented. Use ether (2,2) or (1,1)".format(strides))
-        
 
-        
         self.layer_nbr += 1
         status=  self.Net.maxpool2d(self.layer_nbr,in_buffer.id,in_buffer.channel,out_height, out_width,stride)
         if status != 0:
@@ -210,8 +208,16 @@ class Sequential:
             self.layer_nbr -= 1
             raise Exception("error configuring upsample layer @{}".format(self.layer_nbr+1))
 
-
         return buffer(self.layer_nbr,in_buffer.channel,out_height,out_width)
+
+    def copy(self,in_buffer):       
+        self.layer_nbr += 1
+        status=  self.Net.copy(self.layer_nbr,in_buffer.id,in_buffer.channel,in_buffer.height, in_buffer.width)
+        if status != 0:
+            self.layer_nbr -= 1
+            raise Exception("error configuring copy layer @{}".format(self.layer_nbr+1))
+
+        return buffer(self.layer_nbr,in_buffer.channel,in_buffer.height,in_buffer.width)
 
     def concat(self, in_buffer_0, in_buffer_1):
         self.layer_nbr += 1
@@ -224,7 +230,7 @@ class Sequential:
             self.layer_nbr -= 1
             raise Exception("error configuring network. Concat layer with id: {}".format(self.layer_nbr))        
 
-        return buffer(self.layer_nbr,in_buffer_0.filters+in_buffer_1+filters,in_buffer_0.height,in_buffer_0.width)
+        return buffer(self.layer_nbr,in_buffer_0.channel+in_buffer_1.channel,in_buffer_0.height,in_buffer_0.width)
 
     def split(self, in_buffer, groups):
         self.layer_nbr += 1
