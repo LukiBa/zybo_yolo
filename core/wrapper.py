@@ -72,9 +72,7 @@ class Sequential:
             raise Exception("network requires input and output layer") 
         status, fmap = self.Net.execute(input)
         if status != 0:
-            raise Exception("error in execution of network")   
-        #print(fmap.shape)
-        #print(fmap[208*208*2:208*208*2+10])            
+            raise Exception("error in execution of network")             
     	
         if len(self.outputs) == 1:
             out = fmap.reshape(self.outputs[0].shape)
@@ -90,7 +88,7 @@ class Sequential:
         out_fmaps = []
         out_float = []
         for outs in self.outputs:
-            out = fmap[outpos:outs.size].reshape(outs.shape)
+            out = fmap[outpos:outpos+outs.size].reshape(outs.shape)
             outpos += outs.size
             if self.use_float8:
                 status, img_float = self.Net.float8_to_float32(out)
@@ -144,10 +142,6 @@ class Sequential:
         command_block = conv2d_commands['tx_bin'].astype(np.int32)
         tile_tx_arr = conv2d_commands['tx_tile'].astype(np.uint32)
         tile_rx_arr = conv2d_commands['rx_tile'].astype(np.uint32)
-        print(command_lengths.shape)
-        print(command_block.shape)
-        print(tile_tx_arr.shape)
-        print(tile_rx_arr.shape)
         if kernel_size == (1,1):
             layer_type = self.layer_types['Conv1x1']
         elif kernel_size == (3,3):
