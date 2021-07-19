@@ -3,9 +3,11 @@ import cv2
 import pathlib
 import argparse
 import shutil
+import timeit
 
 from intuitus_intf import Intuitus_intf, Framebuffer, Camera
 import core.wrapper as nn 
+from core.utils import YoloLayer
 
 
 def _create_parser():
@@ -27,6 +29,20 @@ def _create_parser():
 
 layer_nbr = 1
 
+def _yolov3_tiny_config():
+    yolo_lb = { 'anchors':np.array([[81,82],  [135,169],  [344,319]]),
+                'stride': 32,
+                'classes':80}
+
+    yolo_mb = { 'anchors':np.array([[10,14],  [23,27],  [37,58]]),
+                'stride': 16,
+                'classes':80}
+
+    yolo_conf = {   'lb':yolo_lb,
+                    'mb':yolo_mb}
+ 
+    return yolo_conf
+
 def main(flags):
     print(flags)
     #print(flags.print)
@@ -36,6 +52,11 @@ def main(flags):
     image_path = pathlib.Path(__file__).absolute().parent / flags.image
     command_path = pathlib.Path(__file__).absolute().parent / flags.command_path
     out_path = pathlib.Path(__file__).absolute().parent / flags.output
+    if flags.tiny:
+        yolo_config = _yolov3_tiny_config()
+    else:
+        raise NotImplementedError("Add config for non tiny implementaion")
+
 
     if flags.use_cam:
         cam = Camera('/dev/video0')
@@ -48,7 +69,7 @@ def main(flags):
 
     elif '.npz' in flags.image:
         img_npz = np.load(str(image_path),allow_pickle=True)
-        image_data = img_npz['img']
+        image_data = img_npz['img'].astype(np.uint8)
     elif '.npy' in flags.image:
         image_data = np.load(str(image_path),allow_pickle=True)
         print(image_data.shape)
@@ -94,22 +115,36 @@ def main(flags):
     Net.output(conv_lbbox)
     Net.output(conv_mbbox)  
 
+    Yolo_lb = YoloLayer(yolo_config['lb']['anchors'],
+                        yolo_config['lb']['classes'],
+                        yolo_config['lb']['stride'])
+
+    Yolo_mb = YoloLayer(yolo_config['mb']['anchors'],
+                        yolo_config['mb']['classes'],
+                        yolo_config['mb']['stride'])
 
     Net.summary()
     if print_last:
-        Net.print_layer_dma_info(layer_nbr)
-    if exectue_net:    
-        for i in range(flags.iterations):
-            res = Net(image_data)
+        Net.print_layer_dma_info(len(Net))
+    if exectue_net:   
         if out_path.exists():
             shutil.rmtree(out_path, ignore_errors=False, onerror=None)    
         out_path.mkdir(parents=True, exist_ok=True)    
-        # outfile_name = 'fmap_out_' + str(layer_nbr) + '.npy'
-        # np.save(str(out_path / outfile_name), res)
+
+        start = timeit.default_timer() 
+        for i in range(flags.iterations):
+            fmap_out = Net(image_data)
+        cnn_time = timeit.default_timer()
+        pred_lb = Yolo_lb(fmap_out[0][:255,...])
+        pred_mb = Yolo_mb(fmap_out[1][:255,...])
+        yolo_layer_time = timeit.default_timer()
+        print(  "Python Excution time: CNN: {}ms. \n".format((cnn_time-start)*100) + \
+                "YOLO layer(numpy): {}ms. \n".format((yolo_layer_time-cnn_time)*100) + \
+                "Full time: {}ms".format((yolo_layer_time-start)*100))
         outfile_name = 'out_lbbox.npy'
-        np.save(str(out_path / outfile_name), res[0])
+        np.save(str(out_path / outfile_name),pred_lb)
         outfile_name = 'out_mbbox.npy'
-        np.save(str(out_path / outfile_name), res[1])
+        np.save(str(out_path / outfile_name),pred_mb)
 
 if __name__ == '__main__':
     flags = _create_parser()
