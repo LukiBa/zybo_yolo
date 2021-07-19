@@ -445,3 +445,38 @@ def filter_boxes_np(box_xywh, scores, score_threshold=0.4, input_shape = [416,41
     ], axis=-1)
     # return tf.concat([boxes, pred_conf], axis=-1)
     return (boxes, pred_conf)
+
+class yolo_layer():
+    def __init__(self, anchors, nc, yolo_index, layers, stride):
+        self.anchors = anchors
+        self.stride = stride  # layer stride
+        self.na = len(anchors)  # number of anchors (3)
+        self.nc = nc  # number of classes (80)
+        self.no = nc + 5  # number of outputs (85)
+        self.nx, self.ny, self.ng = 0, 0, 0  # initialize number of x, y gridpoints
+        self.anchor_vec = self.anchors / self.stride
+        self.anchor_wh = self.anchor_vec.reshape(1, self.na, 1, 1, 2)
+        self.gird = None
+
+    def create_grids(self, ng=(13,13)):
+        self.ny, self.nx = ng  # y and x grid size
+        self.ng = ng
+
+        xv, yv = np.meshgrid(np.arange(self.nx), np.arange(self.ny))     
+        self.grid = np.stack((xv,yv),axis=-1).reshape(1,1,self.ny,self.ny,2).astype(np.float32)   
+    
+    def sigmoid(x):
+        return 1.0 / (1.0 + np.exp(-x))
+    
+    def __call__(self,p,out):
+        if self.grid == None:
+            _, ny, nx = p.shape  # 255, 13, 13
+            self.create_grids((ny,nx))
+        
+        io = np.transpose(p.reshape(self.na, self.no, self.ny, self.nx),(0,1,3,4,2)).copy('C')
+
+        io[..., :2] = self.sigmoid(io[..., :2]) + self.grid  # xy
+        io[..., 2:4] = np.exp(io[..., 2:4]) * self.anchor_wh  # wh yolo method
+        io[..., :4] *= self.stride
+        io[..., :4] = self.sigmoid(io[..., 4:])
+        return io.reshpe(-1, self.no), p  # view [1, 3, 13, 13, 85] as [1, 507, 85]        
