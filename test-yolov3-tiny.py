@@ -7,20 +7,22 @@ import timeit
 
 from intuitus_intf import Intuitus_intf, Framebuffer, Camera
 import core.wrapper as nn 
-from core.utils import YoloLayer
+from core.utils import YoloLayer, filter_boxes, draw_bbox_nms, nms, read_class_names
 
 
 def _create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--command_path',  type=str, default='./intuitus_commands/yolov3-tiny-commands', help='path to intuitus command files')
+    parser.add_argument('--classes_path',  type=str, default='./data/classes/coco.names', help='path to class name file')
     parser.add_argument('--image',  type=str, default='./cam_data/room384.npz', help='path to input image') # './cam_data/fmap384_out_4.npy') #
     parser.add_argument('--output',  type=str, default='./fmap_out', help='path to output')
     parser.add_argument('--tiny', type=bool, default=True, help='is yolo-tiny or not')
     parser.add_argument('--size', type=int, default=384, help='define input size of export model')
-    parser.add_argument('--iou', type=float, default=0.45, help='iou threshold')
-    parser.add_argument('--score', type=float, default=0.25, help='score threshold')
-    parser.add_argument('--use_cam', type=bool, default=False, help='use camera for input img')
-    parser.add_argument('--use_fb', type=bool, default=False, help='write output to framebuffer')
+    parser.add_argument('--conf_thres', type=float, default=0.15, help='define confidence threshold')
+    parser.add_argument('--iou_thres', type=float, default=0.6, help='define iou threshold')
+    parser.add_argument('--score', type=float, default=0.3, help='object confidence threshold')
+    parser.add_argument('--use_cam', action='store_true', help='use camera for input img')
+    parser.add_argument('--use_fb', action='store_true', help='write output to framebuffer')
     parser.add_argument('--print', action='store_true', help='print network')
     parser.add_argument('--not_execute', action='store_true', help='print network')
     parser.add_argument('--iterations', type=int, default=1, help='execution iterations')
@@ -51,12 +53,14 @@ def main(flags):
     input_size = flags.size
     image_path = pathlib.Path(__file__).absolute().parent / flags.image
     command_path = pathlib.Path(__file__).absolute().parent / flags.command_path
+    class_name_path = pathlib.Path(__file__).absolute().parent / flags.classes_path
     out_path = pathlib.Path(__file__).absolute().parent / flags.output
     if flags.tiny:
         yolo_config = _yolov3_tiny_config()
     else:
         raise NotImplementedError("Add config for non tiny implementaion")
 
+    result_scale = 2.0**-4.0
 
     if flags.use_cam:
         cam = Camera('/dev/video0')
@@ -70,6 +74,7 @@ def main(flags):
     elif '.npz' in flags.image:
         img_npz = np.load(str(image_path),allow_pickle=True)
         image_data = img_npz['img'].astype(np.uint8)
+        print(image_data.shape)
     elif '.npy' in flags.image:
         image_data = np.load(str(image_path),allow_pickle=True)
         print(image_data.shape)
@@ -135,16 +140,37 @@ def main(flags):
         for i in range(flags.iterations):
             fmap_out = Net(image_data)
         cnn_time = timeit.default_timer()
-        pred_lb = Yolo_lb(fmap_out[0][:255,...])
-        pred_mb = Yolo_mb(fmap_out[1][:255,...])
+
+        pred_lb = Yolo_lb(fmap_out[0][:255,...]*result_scale)
+        pred_mb = Yolo_mb(fmap_out[1][:255,...]*result_scale)
+        inf_out = np.concatenate((pred_lb,pred_mb),axis=0)
         yolo_layer_time = timeit.default_timer()
-        print(  "Python Excution time: CNN: {}ms. \n".format((cnn_time-start)*100) + \
-                "YOLO layer(numpy): {}ms. \n".format((yolo_layer_time-cnn_time)*100) + \
-                "Full time: {}ms".format((yolo_layer_time-start)*100))
-        outfile_name = 'out_lbbox.npy'
-        np.save(str(out_path / outfile_name),pred_lb)
-        outfile_name = 'out_mbbox.npy'
-        np.save(str(out_path / outfile_name),pred_mb)
+
+        boxes, pred_conf, classes = filter_boxes(inf_out,flags.conf_thres)
+        best_bboxes = nms(boxes, pred_conf, classes, iou_threshold = flags.iou_thres, 
+                        score=flags.score,method='merge')
+        classes = read_class_names(str(class_name_path))
+        print(classes)
+        image_data = np.moveaxis(image_data,0,-1).astype(np.uint8)*2
+        print(image_data.shape)
+        image = draw_bbox_nms(image_data, best_bboxes,classes)
+
+        print(  "Python Excution time: CNN: {}ms. \n".format((cnn_time-start)*1000) + \
+                "YOLO layer(numpy): {}ms. \n".format((yolo_layer_time-cnn_time)*1000) + \
+                "Full time: {}ms".format((yolo_layer_time-start)*1000))
+        # pred_lb = fmap_out[0][:255,...]
+        # pred_mb = fmap_out[1][:255,...]          
+        outfile_name = 'best_bboxes.npy'    
+        np.save(str(out_path / outfile_name),best_bboxes)
+
+        #image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
+        #outfile_name = 'detect.png'  
+        #cv2.imwrite(str(out_path / outfile_name), image)
+
+        if flags.use_fb:
+            fb = Framebuffer('/dev/fb0')
+            img_bgr = cv2.cvtColor(image_data,cv2.COLOR_RGB2BGR)
+            fb.show(img_bgr,0)
 
 if __name__ == '__main__':
     flags = _create_parser()
