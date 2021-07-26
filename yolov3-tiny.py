@@ -4,7 +4,7 @@ import pathlib
 import argparse
 
 from intuitus_intf import Intuitus_intf, Framebuffer, Camera
-import core.wrapper as nn 
+import intuitus_intf as nn
 
 
 def _create_parser():
