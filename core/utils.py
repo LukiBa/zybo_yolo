@@ -187,7 +187,7 @@ class YoloLayer():
         return 1.0 / (1.0 + np.exp(-x))
     
     def __call__(self,p):
-        if self.grid == None:
+        if not isinstance(self.grid,np.ndarray):
             _, ny, nx = p.shape  # 255, 13, 13
             self.create_grids((ny,nx))
         

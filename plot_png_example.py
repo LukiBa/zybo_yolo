@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from elevate import elevate
-from intuitus_intf import Framebuffer
+from intuitus_nn import Framebuffer
 import cv2
 
 elevate(graphical=False)

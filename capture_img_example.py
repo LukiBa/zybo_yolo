@@ -1,9 +1,10 @@
 import os
 import numpy as np
 from elevate import elevate
-from intuitus_intf import Framebuffer, Camera
+from intuitus_nn import Framebuffer, Camera
 import cv2
 
+elevate()
 cam = Camera('/dev/video0')
 fb = Framebuffer('/dev/fb0')
 status, img_yuv = cam.capture()
