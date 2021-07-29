@@ -103,7 +103,7 @@ def xywh2xyxy(x):
 def filter_boxes(x, conf_thres=0.1):
     x = x[x[:, 4] > conf_thres]
     if not x.shape[0]:
-        return x
+        return np.zeros((0,4)), np.zeros((0,1)),np.zeros((0,1))
 
     # Compute conf
     x[..., 5:] *= x[..., 4:5]  # conf = obj_conf * cls_conf
@@ -161,7 +161,9 @@ def nms(boxes,pred_conf, classes, iou_threshold, sigma=0.3, score=0.1, method='n
             if best_bbox[4] > score:
                 best_bboxes.append(best_bbox)
 
-    return np.array(best_bboxes)
+    if len(best_bbox) > 0:
+        return np.array(best_bboxes)
+    return np.zeros((0,6))
 
 
 class YoloLayer():

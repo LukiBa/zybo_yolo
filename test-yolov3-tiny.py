@@ -137,8 +137,8 @@ def main(flags):
             b,g,r = cv2.split(image_data)
             image_data = np.stack([r,g,b]).astype(np.uint8)
             img_time = timeit.default_timer() 
-            print(  "Img capture time: {}ms.".format((img_cap-img_start)*1000) + \
-                    "Img resize time: {}ms".format((img_time-img_cap)*1000))  
+            print(  "Img capture time: {} ms.\n".format((img_cap-img_start)*1000) + \
+                    "Img resize time: {} ms".format((img_time-img_cap)*1000))  
 
         elif '.npz' in flags.image:
             img_npz = np.load(str(image_path),allow_pickle=True)
@@ -164,17 +164,22 @@ def main(flags):
             yolo_layer_time = timeit.default_timer()
 
             boxes, pred_conf, classes = filter_boxes(inf_out,flags.conf_thres)
+            if not boxes.shape[0]:
+                continue
             best_bboxes = nms(boxes, pred_conf, classes, iou_threshold = flags.iou_thres, 
                             score=flags.score,method='merge')
+            if not best_bboxes.shape[0]:
+                continue                            
             classes = read_class_names(str(class_name_path))
             image_data = np.moveaxis(image_data,0,-1).astype(np.uint8).copy('C')
             image = draw_bbox_nms(image_data, best_bboxes,classes)
+
             nms_time = timeit.default_timer()
 
-            print(  "CNN Excution time: {}ms. \n".format((cnn_time-nn_start)*1000) + \
-                    "YOLO layer(numpy): {}ms. \n".format((yolo_layer_time-cnn_time)*1000) + \
-                    "NMS (numpy): {}ms. \n".format((nms_time-yolo_layer_time)*1000) + \
-                    "Full time: {}ms".format((nms_time-nn_start)*1000))   
+            print(  "CNN Excution time: {} ms. \n".format((cnn_time-nn_start)*1000) + \
+                    "YOLO layer(numpy): {} ms. \n".format((yolo_layer_time-cnn_time)*1000) + \
+                    "NMS (numpy): {} ms. \n".format((nms_time-yolo_layer_time)*1000) + \
+                    "Full time: {} ms".format((nms_time-nn_start)*1000))   
             if flags.save_result_boxes:                
                 outfile_name = 'best_bboxes.npy'    
                 np.save(str(out_path / outfile_name),best_bboxes)
@@ -186,7 +191,7 @@ def main(flags):
             img_bgr = cv2.resize(img_bgr,(screen_size[1],screen_size[0]))
             fb.show(img_bgr,0)
             plot_time = timeit.default_timer()
-            print(  "Plot time: {}ms. \n".format((plot_time-plot_start)*1000))
+            print(  "Plot time: {} ms. \n".format((plot_time-plot_start)*1000))
             
         else:
             image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
