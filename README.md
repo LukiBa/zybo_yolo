@@ -1,5 +1,5 @@
 # Zybo Yolo
-![GitHub](https://img.shields.io/github/license/LukiBa/zybo_yolo)
+![GitHub](https://img.shields.io/github/license/LukiBa/zybo_yolo)  
 YOLOv3 tiny example implementation for Intuitus CNN accelerator using a ZYBO-Z7-20 FPGA board. 
 
 ## Features
@@ -39,7 +39,7 @@ python zybo_yolo/test-yolov3-tiny.py --use_cam --use_fb
 15. cd to intuitus.ko location and insert device driver using ``sudo insmod intuitus.ko``
 16. Run test application using ``python zybo_yolo/test-yolov3-tiny.py --use_cam --use_fb``
 
-## Results ^[The average time of 1000 calls of the Network is used as a measure for inference time.] ^[The power is the power consumption of the board without a connected PCAM and display.]
+## Results <font size="-1"><sup>[1]</sup> <sup>[2]</sup></font> 
 | Mem Clk [MHz] | PE Clk [MHz] | P<sub>idle</sub> [W] | P<sub>exec</sub> [W] | inference time [ms] |
 | ------ | ------ | ------ | ------ | ------ |
 | 100 | 100 | 2.73 | 3.12 | 112 |
@@ -49,6 +49,10 @@ python zybo_yolo/test-yolov3-tiny.py --use_cam --use_fb
 | 125 | 225 | 3.83 | 4.35 | 84 |
 | 125 | 250 | 4.02 | 4.57 | 83 |
 
+[1] The average time of 1000 calls of the Network is used as a measure for inference time (input size: 384x384).  
+[2] The power is the power consumption of the board without a connected PCAM and display.
+
+![Example output](./readme_detect.png)  
 
 ## Related Projects: 
 | Project | link |
@@ -60,5 +64,5 @@ python zybo_yolo/test-yolov3-tiny.py --use_cam --use_fb
 | Intuitus FPGA IP | encrypted trial version comming soon (contact author) |
 
 ## Author
-Lukas Baischer 
+Lukas Baischer   
 lukas_baischer@gmx.at
